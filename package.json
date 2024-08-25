@@ -1,0 +1,16 @@
+{
+  "name": "bus_schedules",
+  "version": "1.0.0",
+  "description": "bus, bus schedules",
+  "main": "index.js",
+  "type": "module",
+  "author": "Andrey A",
+  "license": "MIT",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "luxon": "^3.5.0"
+  }
+}
