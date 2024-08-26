@@ -44,7 +44,21 @@ const renderBusData = buses => {
   tableBody.insertAdjacentHTML('afterbegin', listBusesHandler(buses));
 };
 
+const addZeroHandler = n => (n < 10 ? `0${n}` : n);
+
+const addTimeHandler = () => {
+  const timeEl = document.getElementById('time');
+  const d = new Date();
+  const h = addZeroHandler(d.getHours());
+  const m = addZeroHandler(d.getMinutes());
+  const s = addZeroHandler(d.getSeconds())
+
+  timeEl.innerHTML = `${h}:${m}:${s}`;
+  setTimeout(addTimeHandler, 1000);
+};
+
 const init = async () => {
+  addTimeHandler();
   const buses = await fetchBusData();
   renderBusData(buses);
 };
