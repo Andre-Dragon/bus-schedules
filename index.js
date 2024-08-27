@@ -1,6 +1,7 @@
 import express from 'express';
-import { DateTime } from 'luxon';
+import { DateTime, Duration } from 'luxon';
 import { readFile } from 'node:fs/promises';
+import { WebSocketServer } from 'ws';
 import path from 'node:path';
 import url from 'node:url';
 
@@ -23,11 +24,13 @@ const loadBases = async () => {
 // Высчитываем следующие время отправления
 const getNextDeparture = (fdt, fm) => {
   const now = DateTime.now().setZone(timeZone);
-  const [hours, minutes] = fdt.split(':').map(Number);
+  const [hour, minute, second] = fdt.split(':').map(Number);
   let departure = DateTime.now()
     .set({
-      hours,
-      minutes
+      hour,
+      minute,
+      second,
+      millisecond: 0
     })
     .setZone(timeZone);
 
@@ -37,9 +40,9 @@ const getNextDeparture = (fdt, fm) => {
 
   const endOfDay = DateTime.now()
     .set({
-      hours: 23,
-      minutes: 59,
-      seconds: 59
+      hour: 23,
+      minute: 59,
+      second: 59
     })
     .setZone(timeZone);
 
@@ -47,7 +50,7 @@ const getNextDeparture = (fdt, fm) => {
     departure = departure
       .startOf('day')
       .plus({ days: 1 })
-      .set({ hours, minutes });
+      .set({ hour, minute, second });
   }
 
   while (now > departure) {
@@ -57,7 +60,7 @@ const getNextDeparture = (fdt, fm) => {
       departure = departure
         .startOf('day')
         .plus({ days: 1 })
-        .set({ hours, minutes });
+        .set({ hour, minute, second });
     }
   }
 
@@ -67,17 +70,23 @@ const getNextDeparture = (fdt, fm) => {
 // Обновляем данные расписания автобусов
 const sendUpdatedData = async () => {
   const buses = await loadBases();
+  const now = DateTime.now().setZone(timeZone);
   const updatedBuses = buses.map(bus => {
     const nextDeparture = getNextDeparture(
       bus.firstDepartureTime,
       bus.frequencyMinutes
     );
 
+    const timeRemaining = Duration.fromMillis(
+      nextDeparture.diff(now).toMillis()
+    );
+
     return {
       ...bus,
       nextDeparture: {
         date: nextDeparture.toFormat('yyyy-MM-dd'),
-        time: nextDeparture.toFormat('HH:mm:ss')
+        time: nextDeparture.toFormat('HH:mm:ss'),
+        remaining: timeRemaining.toFormat('hh:mm:ss')
       }
     };
   });
@@ -107,7 +116,40 @@ app.get('/next-departure', async (req, res) => {
   }
 });
 
+// Создаем WebSocketServer
+const wss = new WebSocketServer({ noServer: true });
+const clients = new Set();
+
+wss.on('connection', ws => {
+  console.log('Websocket соединился');
+  clients.add(ws);
+
+  const sendUpdates = async () => {
+    try {
+      const updatedBuses = await sendUpdatedData();
+      const sortedBuses = sortBuses(updatedBuses);
+      ws.send(JSON.stringify(sortedBuses));
+    } catch (error) {
+      console.error(`Ошибка соединения  websocket: ${error}`);
+    }
+  };
+
+  const intervalId = setInterval(sendUpdates, 1000);
+
+  ws.on('close', () => {
+    clearInterval(intervalId);
+    clients.delete(ws);
+    console.log('Websocket закрыт');
+  });
+});
+
 // Запуск локального сервера http://localhost:3000
-app.listen(port, () => {
+const server = app.listen(port, () => {
   console.log(`Ваш порт запущен на http://localhost:${port}`);
+});
+
+server.on('upgrade', (req, socket, head) => {
+  wss.handleUpgrade(req, socket, head, ws => {
+    wss.emit('connection', ws, req);
+  });
 });
