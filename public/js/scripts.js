@@ -16,11 +16,6 @@ const formatDate = date => date.toISOString().split('T')[0];
 
 const formatTime = date => date.toTimeString().split(' ')[0].slice(0, 8);
 
-const getRemainingTimeHandler = timeDeparture => {
-  const now = new Date();
-  return Math.floor((Number(timeDeparture) - Number(now)) / 1000);
-};
-
 const createListBuses = ({
   busNumber,
   startPoint,
@@ -30,10 +25,6 @@ const createListBuses = ({
   const nextDepartureDateTimeUTC = new Date(
     `${nextDeparture.date}T${nextDeparture.time}Z`
   );
-  const remainingTime = getRemainingTimeHandler(nextDepartureDateTimeUTC);
-
-  const remainingTimeText =
-    remainingTime < 60 ? 'В пути' : nextDeparture.remaining;
 
   return `
     <tr>
@@ -41,7 +32,7 @@ const createListBuses = ({
       <td>${startPoint} - ${endPoint}</td>
       <td>${formatDate(nextDepartureDateTimeUTC)}</td>
       <td>${formatTime(nextDepartureDateTimeUTC)}</td>
-      <td>${remainingTimeText}</td>
+      <td>${nextDeparture.remaining}</td>
     </tr>
   `;
 };
