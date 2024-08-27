@@ -13,12 +13,16 @@ const timeZone = 'UTC';
 
 // Получаем данные расписания
 const loadBases = async () => {
-  const data = await readFile(
+  try {
+    const data = await readFile(
     path.join(__dirname, 'database/buses.json'),
     'utf-8'
   );
 
   return JSON.parse(data);
+  } catch (error) {
+    console.error(error);
+  }
 };
 
 // Высчитываем следующие время отправления
@@ -34,10 +38,6 @@ const getNextDeparture = (fdt, fm) => {
     })
     .setZone(timeZone);
 
-  if (now > departure) {
-    departure = departure.plus({ minutes: fm });
-  }
-
   const endOfDay = DateTime.now()
     .set({
       hour: 23,
@@ -46,21 +46,14 @@ const getNextDeparture = (fdt, fm) => {
     })
     .setZone(timeZone);
 
-  if (departure > endOfDay) {
-    departure = departure
-      .startOf('day')
-      .plus({ days: 1 })
-      .set({ hour, minute, second });
-  }
-
   while (now > departure) {
     departure = departure.plus({ minutes: fm });
 
     if (departure > endOfDay) {
-      departure = departure
-        .startOf('day')
+      departure = DateTime.now()
+        .set({ hour, minute, second })
         .plus({ days: 1 })
-        .set({ hour, minute, second });
+        .setZone(timeZone);
     }
   }
 
